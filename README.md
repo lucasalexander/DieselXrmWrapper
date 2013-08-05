@@ -16,6 +16,6 @@ The following features are currently planned:
 
 1. Storing query FetchXml and related configuration data as custom entities in Dynamics CRM
 2. Role-based authorization for individual queries
-3. Varying impersonation settings for individual query
+3. Varying impersonation settings per individual query
 4. Updates
 5. REST/JSON interfaces
