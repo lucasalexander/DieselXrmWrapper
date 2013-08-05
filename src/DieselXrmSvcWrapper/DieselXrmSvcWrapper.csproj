@@ -40,14 +40,14 @@
   </PropertyGroup>
   <ItemGroup>
     <Reference Include="microsoft.crm.sdk.proxy">
-      <HintPath>..\..\..\crmsdk\bin\microsoft.crm.sdk.proxy.dll</HintPath>
+      <HintPath>..\..\refsmicrosoft.crm.sdk.proxy.dll</HintPath>
     </Reference>
     <Reference Include="Microsoft.CSharp" />
     <Reference Include="microsoft.xrm.client">
-      <HintPath>..\..\..\crmsdk\bin\microsoft.xrm.client.dll</HintPath>
+      <HintPath>..\..\refsmicrosoft.xrm.client.dll</HintPath>
     </Reference>
     <Reference Include="microsoft.xrm.sdk">
-      <HintPath>..\..\..\crmsdk\bin\microsoft.xrm.sdk.dll</HintPath>
+      <HintPath>..\..\refsmicrosoft.xrm.sdk.dll</HintPath>
     </Reference>
     <Reference Include="System.IdentityModel" />
     <Reference Include="System.IdentityModel.Selectors" />
