@@ -1,0 +1,9 @@
+﻿<?xml version="1.0" encoding="utf-8" ?>
+<fetch mapping="logical" aggregate="true" distinct="false">
+  <entity name="contact">
+    <attribute name="fullname" alias="fullname_count" aggregate="count"></attribute>
+    <attribute name="annualincome" alias="annualincome_sum" aggregate="sum"></attribute>
+    <attribute name="address1_stateorprovince" groupby="true" alias="state_province"></attribute>
+    <attribute name="ownerid" groupby="true" alias="owner"></attribute>
+  </entity>
+</fetch>

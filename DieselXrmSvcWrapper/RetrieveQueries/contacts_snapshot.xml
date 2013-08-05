@@ -1,0 +1,17 @@
+<fetch version="1.0" output-format="xml-platform" mapping="logical" distinct="false">
+  <entity name="contact">
+    <attribute name="fullname" />
+    <attribute name="contactid" />
+    <attribute name="ownerid" />
+    <attribute name="annualincome_base" />
+    <attribute name="annualincome" />
+    <attribute name="address1_stateorprovince" />
+    <attribute name="gendercode" />
+    <attribute name="createdon" />
+    <order attribute="fullname" descending="false" />
+    <filter type="and">
+      <condition attribute="lastname" operator="like" value="{$lastnamefirstletter}%" />
+      <condition attribute="lastname" operator="like" value="%{$lastnamelastletter}" />
+    </filter>
+  </entity>
+</fetch>
