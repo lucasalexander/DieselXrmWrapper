@@ -6,6 +6,7 @@ using System.Security.Principal;
 using Microsoft.Crm.Sdk.Messages;
 using Microsoft.Xrm.Client;
 using Microsoft.Xrm.Client.Services;
+using Microsoft.Xrm.Sdk;
 using System.ServiceModel;
 using System.Web;
 
@@ -43,8 +44,24 @@ namespace DieselXrmSvcWrapper
                 {
                     WhoAmIRequest req = new WhoAmIRequest();
                     WhoAmIResponse resp = (WhoAmIResponse)service.Execute(req);
+                    Entity systemuser = CrmUtils.GetSystemUser(resp.UserId, service);
+
+
+                    CrmIdentity crmIdentity = new CrmIdentity();
+                    crmIdentity.Name = (string)systemuser["fullname"];
+                    crmIdentity.FirstName = (string)systemuser["firstname"];
+                    crmIdentity.LastName = (string)systemuser["lastname"];
+                    crmIdentity.Email = (string)systemuser["internalemailaddress"];
+                    crmIdentity.UserId = resp.UserId;
+                    crmIdentity.SetAuthenticated(true);
+
                     List<string> roles = CrmUtils.GetUserRoles(resp.UserId, service);
-                    context.User = new GenericPrincipal(new GenericIdentity(resp.UserId.ToString()), roles.ToArray());
+                    foreach (string role in roles)
+                    {
+                        crmIdentity.AddRole(role);
+                    }
+
+                    context.User = new GenericPrincipal(crmIdentity, roles.ToArray());
                 }
                 catch (System.ServiceModel.Security.MessageSecurityException ex)
                 {

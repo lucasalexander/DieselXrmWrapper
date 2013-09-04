@@ -116,6 +116,12 @@ namespace DieselXrmSvcWrapper
             return output;
         }
 
+        public static Entity GetSystemUser(Guid userid, OrganizationService service)
+        {
+            Entity systemuser = service.Retrieve("systemuser", userid, new ColumnSet(true));
+            return systemuser;
+        }
+
         /// <summary>
         /// retrieves a list of CRM roles assigned to a specific user
         /// </summary>

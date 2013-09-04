@@ -28,45 +28,8 @@ namespace DieselXrmSvcWrapper
         /// <param name="query">Name of the query. Corresponding file will be named "query".xml</param>
         /// <param name="inputParameters">Array of parameters for substitution in the query.</param>
         /// <returns></returns>
-        private string PrepareFetchQuery(string query, List<ParameterItem> inputParameters)
+        private string PrepareFetchQuery(string fetchXML, List<ParameterItem> inputParameters)
         {
-            var appPath = System.Web.Hosting.HostingEnvironment.ApplicationPhysicalPath;
-
-            //we don't actually do anything with this now, but let's leave it in for the future
-            //List<string> fetchFields = new List<string>();
-            
-            string fetchXML = "";
-
-            //load the query xml file for some xpathing
-            var doc = new XPathDocument(appPath + @"\"+ConfigurationManager.AppSettings["retrievequerydir"]+ @"\" + query + ".xml");
-            XPathNavigator nav = doc.CreateNavigator();
-
-            //xpath query to find the "fetch" element. using "//" instead of "/" if i want to add extra bits to the query
-            //files later
-            XPathNodeIterator entityIterator = nav.Select("//fetch");
-            
-            while (entityIterator.MoveNext())
-            {
-                //get the fetchxml query
-                fetchXML = entityIterator.Current.OuterXml;
-                
-                //populates fetchFields string - leaving in, but commented out for now
-                //XPathNodeIterator attributeIterator = entityIterator.Current.Select("entity/attribute");
-                //while (attributeIterator.MoveNext())
-                //{
-                //    XPathNavigator attributeNav = attributeIterator.Current;
-                //    if (attributeNav.GetAttribute("alias", "") != "")
-                //    {
-                //        fetchFields.Add(attributeNav.GetAttribute("alias", ""));
-                //    }
-                //    else
-                //    {
-                //        fetchFields.Add(attributeNav.GetAttribute("name", ""));
-                //    }
-                //}
-            }
-
-            //search for substitution placeholders in form of {$PARAMETER NAME}
             string pattern = @"\{\$.*\}";
             Regex rgx = new Regex(pattern);
             MatchCollection matches = rgx.Matches(fetchXML);
@@ -99,25 +62,25 @@ namespace DieselXrmSvcWrapper
         {
             //need to get the id of the user to impersonate from the HttpContext.User object
             HttpContext context = HttpContext.Current;
-            string runasuser = "";
+            Guid runasuser = Guid.Empty;
+
+            //get a reference to the custom CRM identity object
+            CrmIdentity crmIdentity = (CrmIdentity)context.User.Identity;
 
             if (context != null)
             {
                 //if we're to this point, this value should be populated. if not, we'll see an error later when we try to use a blank id
-                runasuser = context.User.Identity.Name;
+                runasuser = crmIdentity.UserId;
             }
 
             //instantiate the output object
             List<List<ParameterItem>> output = new List<List<ParameterItem>>();
 
-            //get the prepared fetchxml query
-            string fetchXml = PrepareFetchQuery(query, inputParameters);
-
             //get a connection to crm
             Microsoft.Xrm.Client.CrmConnection connection = CrmUtils.GetCrmConnection();
             
             //set callerid for impersonation
-            connection.CallerId = new Guid(runasuser);
+            connection.CallerId = runasuser;
 
             //execute the query, loop through results, format output, etc.
             using (OrganizationService service = new OrganizationService(connection))
@@ -128,37 +91,68 @@ namespace DieselXrmSvcWrapper
                 //runasitem.Add(new ParameterItem { Name = "roles", Value = context.User.IsInRole("sales manager").ToString() });
                 //output.Add(runasitem);
 
-                EntityCollection results = service.RetrieveMultiple(new FetchExpression(fetchXml));
-                foreach (Entity entity in results.Entities)
+                //prepare a query to retrieve the wrapper query record from crm
+                string wrapperQueryFetch = @"<fetch distinct='false' mapping='logical' output-format='xml-platform' version='1.0'>
+	                <entity name='la_wrapperquery'>
+		                <attribute name='la_wrapperqueryid'/>
+		                <attribute name='la_name'/>
+		                <attribute name='la_query'/>
+		                <order descending='false' attribute='la_name'/>
+		                <filter type='and'>
+			                <condition attribute='statuscode' value='1' operator='eq'/>
+			                <condition attribute='la_name' value='{$queryname}' operator='eq'/>
+		                </filter>
+	                </entity>
+                </fetch>";
+
+                wrapperQueryFetch = wrapperQueryFetch.Replace("{$queryname}", query);
+
+                //retrieve the wrapper query record
+                EntityCollection wrapperQueryCollection = service.RetrieveMultiple(new FetchExpression(wrapperQueryFetch));
+                if (wrapperQueryCollection.Entities.Count == 1)
                 {
-                    //loop through the mapping key-value pairs
-                    List<ParameterItem> item = new List<ParameterItem>();
-                    foreach (var attribute in entity.Attributes)
-                    {
-                        item.Add(new ParameterItem { Name = attribute.Key, Value = CrmUtils.GetAttributeValue(attribute.Value) });
+                    Entity wrapperQuery = wrapperQueryCollection.Entities[0];
 
-                        //the _name and _type fields do some user-friendly formatting
-                        string attributelabel = (string)CrmUtils.GetAttributeName(attribute.Value);
-                        if (attributelabel != "")
+                    //prepare the wrapper query by doing any necessary parameter substitutions
+                    string fetchXml = PrepareFetchQuery((string)wrapperQuery["la_query"], inputParameters);
+
+                    //execute the actual query
+                    EntityCollection results = service.RetrieveMultiple(new FetchExpression(fetchXml));
+                    foreach (Entity entity in results.Entities)
+                    {
+                        //loop through the mapping key-value pairs
+                        List<ParameterItem> item = new List<ParameterItem>();
+                        foreach (var attribute in entity.Attributes)
                         {
-                            item.Add(new ParameterItem { Name = attribute.Key + "_name", Value = attributelabel });
+                            item.Add(new ParameterItem { Name = attribute.Key, Value = CrmUtils.GetAttributeValue(attribute.Value) });
+
+                            //the _name and _type fields do some user-friendly formatting
+                            string attributelabel = (string)CrmUtils.GetAttributeName(attribute.Value);
+                            if (attributelabel != "")
+                            {
+                                item.Add(new ParameterItem { Name = attribute.Key + "_name", Value = attributelabel });
+                            }
+
+                            string attributeentitytype = (string)CrmUtils.GetAttributeEntityType(attribute.Value);
+                            if (attributeentitytype != "")
+                            {
+                                item.Add(new ParameterItem { Name = attribute.Key + "_type", Value = attributeentitytype });
+                            }
+
                         }
 
-                        string attributeentitytype = (string)CrmUtils.GetAttributeEntityType(attribute.Value);
-                        if (attributeentitytype != "")
+                        //optionset labels and formatted currency values are available in the formattedvalues collection
+                        foreach (var fv in entity.FormattedValues)
                         {
-                            item.Add(new ParameterItem { Name = attribute.Key + "_type", Value = attributeentitytype });
+                            item.Add(new ParameterItem { Name = fv.Key + "_formattedvalue", Value = fv.Value });
                         }
 
+                        output.Add(item);
                     }
-
-                    //optionset labels and formatted currency values are available in the formattedvalues collection
-                    foreach (var fv in entity.FormattedValues)
-                    {
-                        item.Add(new ParameterItem { Name = fv.Key + "_formattedvalue", Value = fv.Value });
-                    }
-
-                    output.Add(item);
+                }
+                else
+                {
+                    throw new Exception("Could not find active query with the supplied name.");
                 }
                 return output;
             }

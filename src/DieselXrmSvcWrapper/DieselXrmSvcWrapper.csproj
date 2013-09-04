@@ -79,6 +79,7 @@
     <Content Include="SoapSvc.svc" />
   </ItemGroup>
   <ItemGroup>
+    <Compile Include="CrmIdentity.cs" />
     <Compile Include="CrmUsernamePasswordValidator.cs" />
     <Compile Include="CrmUtils.cs" />
     <Compile Include="ISoapSvc.cs" />
